@@ -4,6 +4,7 @@ The browser edition is a static website. Hostinger serves HTML, JavaScript, font
 
 ## What works
 
+- Choose a video, then press **Make short automatically** for moment selection, optional local captions and MP4 export in one operation. If the source has no usable audio or caption generation fails, export continues with a clear notice instead of stopping before an MP4 is produced.
 - Import a local video up to 500 MB, trim a clip up to 180 seconds, and render H.264/AAC MP4.
 - Vertical centre crop, fit with black bars, or original frame. Vertical export at 480 × 854 or 720 × 1280.
 - Find a high-energy audio window; this is a loudness suggestion, not AI content ranking.

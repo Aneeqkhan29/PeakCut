@@ -90,6 +90,31 @@ try {
   assert.deepEqual(errors, []);
   console.log('PASS: real browser render, H.264/AAC output, vertical dimensions, captions, SRT, audio highlight, invalid range, cancellation/retry, mobile layout, no upload requests.');
 
+  await page.locator('#auto-captions').uncheck();
+  await page.locator('#automatic').click();
+  await page.waitForFunction(() => document.getElementById('status').textContent.includes('Your automatic short is ready'), null, { timeout: 180000 });
+  const automaticEvent = page.waitForEvent('download');
+  await page.locator('#download').click();
+  const automaticFile = path.join(output, 'browser-automatic.mp4');
+  await (await automaticEvent).saveAs(automaticFile);
+  const automaticInfo = JSON.parse(execFileSync('ffprobe', ['-v','quiet','-show_streams','-of','json',automaticFile], { encoding: 'utf8' }));
+  assert.equal(automaticInfo.streams.find(s => s.codec_type === 'video').height, 854);
+  assert.ok(automaticInfo.streams.some(s => s.codec_type === 'audio'));
+  console.log('PASS: one-click automatic selection and MP4 export.');
+
+  const silentFile = path.join(output, 'browser-silent.mp4');
+  execFileSync('ffmpeg', ['-hide_banner','-loglevel','error','-y','-f','lavfi','-i','testsrc2=size=320x180:rate=10','-t','2','-c:v','libx264','-pix_fmt','yuv420p',silentFile]);
+  await page.locator('#file').setInputFiles(silentFile);
+  await page.waitForFunction(() => !document.getElementById('settings').disabled);
+  await page.locator('#auto-captions').check();
+  await page.locator('#automatic').click();
+  await page.waitForFunction(() => document.getElementById('status').textContent.includes('Your automatic short is ready'), null, { timeout: 180000 });
+  assert.match(await page.locator('#status').textContent(), /Captions could not be generated/);
+  await page.locator('#download').waitFor({ state: 'visible' });
+  console.log('PASS: video without audio still exports automatically, with clear caption/highlight notices.');
+  assert.deepEqual(uploads, [], 'Automatic processing must not upload user media');
+  assert.deepEqual(errors, []);
+
   if (process.env.RUN_CAPTIONS === '1') {
     const response = await fetch('https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/jfk.wav');
     assert.ok(response.ok);
@@ -100,12 +125,14 @@ try {
     await page.locator('#file').setInputFiles(speechVideo);
     await page.waitForFunction(() => !document.getElementById('settings').disabled);
     await page.locator('#language').selectOption('english');
-    await page.locator('#transcribe').click();
-    await page.waitForFunction(() => document.getElementById('status').textContent.includes('Captions generated') || document.getElementById('state-badge').classList.contains('error'), null, { timeout: 600000 });
+    await page.locator('#automatic').click();
+    await page.waitForFunction(() => document.getElementById('status').textContent.includes('Your automatic short is ready') || document.getElementById('state-badge').classList.contains('error'), null, { timeout: 600000 });
     const status = await page.locator('#status').textContent();
-    assert.match(status, /Captions generated/, (await page.locator('#log').textContent()) + '\n' + status);
+    assert.match(status, /Your automatic short is ready/, (await page.locator('#log').textContent()) + '\n' + status);
+    assert.doesNotMatch(status, /could not/);
     assert.ok(await page.locator('.caption-row').count() > 0);
-    console.log('PASS: real browser Whisper transcription:', await page.locator('.caption-row input').first().inputValue());
+    await page.locator('#download-srt').waitFor({ state: 'visible' });
+    console.log('PASS: one-click highlight → real Whisper captions → rendered MP4:', await page.locator('.caption-row input').first().inputValue());
   }
 } finally {
   await browser.close();

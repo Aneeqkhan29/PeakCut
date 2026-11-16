@@ -1,5 +1,5 @@
 const $ = id => document.getElementById(id);
-const ui = Object.fromEntries(['file','dropzone','settings','source','source-panel','filename','filemeta','replace','start','duration','layout','size','use-playhead','find','suggestion','language','transcribe','captions','manual','apply-manual','clear-captions','render','status','state-badge','progress','cancel','log','result','output','download','download-srt','resultmeta','clear-result'].map(id => [id, $(id)]));
+const ui = Object.fromEntries(['file','dropzone','settings','source','source-panel','filename','filemeta','replace','start','duration','layout','size','use-playhead','find','suggestion','language','transcribe','captions','manual','apply-manual','clear-captions','render','status','state-badge','progress','cancel','log','result','output','download','download-srt','resultmeta','clear-result','automatic','auto-captions'].map(id => [id, $(id)]));
 let sourceFile, sourceURL, outputURL, srtURL, ffmpeg, modelWorker;
 let sourceDuration = 0, busy = false, generation = 0, engineInput = false, progressSeconds = 1;
 let captions = [], logs = [];
@@ -197,7 +197,7 @@ async function extractAudio(engine, start, duration) {
   await removeFile(engine, 'audio.raw');
   return samples;
 }
-ui.find.addEventListener('click', () => run(async token => {
+async function findMoment(token) {
   const { duration } = selectedRange();
   if (sourceDuration > 1800) throw new Error('Highlight search supports videos up to 30 minutes in browser mode. Choose a moment manually for longer videos.');
   const engine = await loadEngine(token);
@@ -224,7 +224,8 @@ ui.find.addEventListener('click', () => run(async token => {
   ui.suggestion.textContent = `Suggested start: ${ui.start.value}s. This is the loudest ${duration.toFixed(1)}-second window; review the content before rendering.`;
   ui.suggestion.hidden = false;
   status('Highlight suggestion ready. Review the selected moment.');
-}));
+}
+ui.find.addEventListener('click', () => run(findMoment));
 
 function transcribe(samples, language, token) {
   if (!modelWorker) modelWorker = new Worker('/assets/caption-worker.js', { type: 'module' });
@@ -245,7 +246,7 @@ function transcribe(samples, language, token) {
     worker.postMessage({ samples, language }, [samples.buffer]);
   });
 }
-ui.transcribe.addEventListener('click', () => run(async token => {
+async function captionSelected(token) {
   const { start, duration } = selectedRange();
   const engine = await loadEngine(token);
   status('Extracting the selected clip audio locally…');
@@ -258,7 +259,8 @@ ui.transcribe.addEventListener('click', () => run(async token => {
   if (!captions.length) throw new Error('No speech was recognised in this clip. Try another moment or write captions manually.');
   drawCaptions();
   status('Captions generated on this device. Review and edit them before rendering.');
-}));
+}
+ui.transcribe.addEventListener('click', () => run(captionSelected));
 
 function assTime(seconds) {
   const cs = Math.max(0, Math.round(seconds * 100));
@@ -279,7 +281,7 @@ function srtTime(seconds) {
   const ms = Math.max(0, Math.round(seconds * 1000));
   return `${String(Math.floor(ms/3600000)).padStart(2,'0')}:${String(Math.floor(ms/60000)%60).padStart(2,'0')}:${String(Math.floor(ms/1000)%60).padStart(2,'0')},${String(ms%1000).padStart(3,'0')}`;
 }
-ui.render.addEventListener('click', () => run(async token => {
+async function renderSelected(token) {
   const { start, duration } = selectedRange();
   const engine = await loadEngine(token);
   checkToken(token);
@@ -322,6 +324,36 @@ ui.render.addEventListener('click', () => run(async token => {
     await removeFile(engine, 'output.mp4');
     await removeFile(engine, 'captions.ass');
   }
+}
+ui.render.addEventListener('click', () => run(renderSelected));
+ui.automatic.addEventListener('click', () => run(async token => {
+  selectedRange();
+  clearResult();
+  clearCaptions();
+  const notices = [];
+  try {
+    await findMoment(token);
+  } catch (error) {
+    checkToken(token);
+    log(`Automatic selection: ${error.message}`);
+    notices.push('A highlight could not be selected; the current start time was used.');
+  }
+  checkToken(token);
+  if (ui['auto-captions'].checked) {
+    try {
+      await captionSelected(token);
+    } catch (error) {
+      checkToken(token);
+      log(`Automatic captions: ${error.message}`);
+      clearCaptions();
+      notices.push('Captions could not be generated. You can add them manually and render again.');
+    }
+  }
+  checkToken(token);
+  await renderSelected(token);
+  checkToken(token);
+  status(`Your automatic short is ready. ${notices.join(' ')} Download it before leaving this page.`);
+  ui.result.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }));
 ui.cancel.addEventListener('click', () => {
   generation++;
