@@ -7,7 +7,7 @@ let cancelModel;
 
 function log(message) {
   logs.push(message);
-  logs = logs.slice(-35);
+  logs = logs.slice(-150);
   ui.log.textContent = logs.join('\n');
 }
 function status(message, error = false) {
@@ -265,11 +265,15 @@ function assTime(seconds) {
   return `${Math.floor(cs/360000)}:${String(Math.floor(cs/6000)%60).padStart(2,'0')}:${String(Math.floor(cs/100)%60).padStart(2,'0')}.${String(cs%100).padStart(2,'0')}`;
 }
 function cleanCaption(text) {
-  return text.replace(/\\/g, '／').replace(/[{}]/g, '').replace(/[\r\n]+/g, ' ').trim();
+  return text.replace(/\\/g, '/').replace(/[{}]/g, '').replace(/[\r\n]+/g, ' ').trim();
+}
+function styledCaption(text) {
+  return cleanCaption(text).replace(/([\u0600-\u06ff\u0750-\u077f\u08a0-\u08ff\ufb50-\ufdff\ufe70-\ufeff]+)|([\u0900-\u097f\ua8e0-\ua8ff]+)/g,
+    (run, arabic) => `{\\fn${arabic ? 'Noto Naskh Arabic' : 'Noto Sans Devanagari'}}${run}{\\fnPoppins ExtraBold}`);
 }
 function makeAss(width, height) {
   const fontSize = Math.round(width * 0.065);
-  return `[Script Info]\nScriptType: v4.00+\nPlayResX: ${width}\nPlayResY: ${height}\nWrapStyle: 0\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Default,Poppins ExtraBold,${fontSize},&H00FFFFFF,&H000000FF,&H00120E0B,&H80000000,-1,0,0,0,100,100,0,0,1,${Math.max(2,Math.round(width/180))},0,2,${Math.round(width*.07)},${Math.round(width*.07)},${Math.round(height*.12)},1\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n` + captions.filter(c => c.text.trim()).map(c => `Dialogue: 0,${assTime(c.start)},${assTime(c.end)},Default,,0,0,0,,${cleanCaption(c.text)}\n`).join('');
+  return `[Script Info]\nScriptType: v4.00+\nPlayResX: ${width}\nPlayResY: ${height}\nWrapStyle: 0\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Default,Poppins ExtraBold,${fontSize},&H00FFFFFF,&H000000FF,&H00120E0B,&H80000000,-1,0,0,0,100,100,0,0,1,${Math.max(2,Math.round(width/180))},0,2,${Math.round(width*.07)},${Math.round(width*.07)},${Math.round(height*.12)},1\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n` + captions.filter(c => c.text.trim()).map(c => `Dialogue: 0,${assTime(c.start)},${assTime(c.end)},Default,,0,0,0,,${styledCaption(c.text)}\n`).join('');
 }
 function srtTime(seconds) {
   const ms = Math.max(0, Math.round(seconds * 1000));

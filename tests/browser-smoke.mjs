@@ -26,7 +26,7 @@ const server = http.createServer(async (req, res) => {
   } catch { res.writeHead(404).end('Not found'); }
 });
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-const origin = `http://127.0.0.1:${server.address().port}`;
+const origin = process.env.BROWSER_TEST_ORIGIN || `http://127.0.0.1:${server.address().port}`;
 const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true });
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, acceptDownloads: true });
@@ -38,7 +38,7 @@ try {
   await page.locator('#render').waitFor({ state: 'visible' });
   await page.waitForFunction(() => !document.getElementById('settings').disabled);
   await page.locator('#duration').fill('2');
-  await page.locator('#manual').fill('Hello from PeakCut\nA real browser export {\\pos(0,0)}');
+  await page.locator('#manual').fill('Hello from PeakCut\nاردو کیپشن · हिन्दी कैप्शन {\\pos(0,0)}');
   await page.locator('#apply-manual').click();
   assert.equal(await page.locator('.caption-row').count(), 2);
   await page.locator('#render').click();
@@ -48,6 +48,9 @@ try {
   const download = await downloadEvent;
   const rendered = path.join(output, 'browser-output.mp4');
   await download.saveAs(rendered);
+  const renderLog = await page.locator('#log').textContent();
+  await writeFile(path.join(output, 'browser-render.log'), renderLog);
+  for (const family of ['Poppins', 'Noto Naskh Arabic', 'Noto Sans Devanagari']) assert.ok(renderLog.includes(`fontselect: (${family}`), `Caption font must render: ${family}`);
   const info = JSON.parse(execFileSync('ffprobe', ['-v','quiet','-show_streams','-show_format','-of','json',rendered], { encoding: 'utf8' }));
   const video = info.streams.find(s => s.codec_type === 'video');
   assert.equal(video.width, 480);
@@ -62,6 +65,7 @@ try {
   assert.match(srt, /00:00:00,000 --> 00:00:01,000/);
   assert.match(srt, /Hello from PeakCut/);
   execFileSync('ffmpeg', ['-hide_banner','-loglevel','error','-y','-i',rendered,'-frames:v','1',path.join(output,'browser-output.png')]);
+  execFileSync('ffmpeg', ['-hide_banner','-loglevel','error','-y','-ss','1.5','-i',rendered,'-frames:v','1',path.join(output,'browser-output-multilingual.png')]);
   await page.screenshot({ path: path.join(output, 'browser-studio.png'), fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'Mobile layout must not overflow');
