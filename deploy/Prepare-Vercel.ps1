@@ -1,6 +1,7 @@
 param(
     [Parameter(Mandatory = $true)]
-    [uri]$BackendUrl
+    [uri]$BackendUrl,
+    [switch]$ReplaceStatic
 )
 $ErrorActionPreference = 'Stop'
 if ($BackendUrl.Scheme -ne 'https' -or -not $BackendUrl.Host -or
@@ -11,7 +12,10 @@ if ($BackendUrl.Scheme -ne 'https' -or -not $BackendUrl.Host -or
 $root = Split-Path $PSScriptRoot -Parent
 $target = Join-Path $root 'vercel.json'
 if (Test-Path -LiteralPath $target) {
-    throw 'vercel.json already exists. Review it before replacing it.'
+    $existing = Get-Content -LiteralPath $target -Raw | ConvertFrom-Json
+    if (-not $ReplaceStatic -or $existing.buildCommand -ne 'node deploy/build-vercel.mjs') {
+        throw 'vercel.json already exists. Use -ReplaceStatic only to replace the static website configuration.'
+    }
 }
 $origin = $BackendUrl.GetLeftPart([System.UriPartial]::Authority)
 $config = [ordered]@{

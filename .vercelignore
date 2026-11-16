@@ -1,0 +1,15 @@
+.venv/
+venv/
+data/
+secrets/
+.env
+.env.*
+storage.json
+studio/
+tests/
+requirements.txt
+__pycache__/
+*.log
+*.db
+*.sqlite*
+dist/

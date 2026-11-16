@@ -1,6 +1,8 @@
 # Vercel with a separate PeakCut server
 
-PeakCut's FFmpeg work, speech model, background queue and saved files run on a persistent server. This setup uses Vercel only to forward requests to that server; it does not run video processing in Vercel Functions.
+The public website is deployed at https://peakcut-ochre.vercel.app and connected to the GitHub repository. The current `vercel.json` builds the landing page and setup information with `node deploy/build-vercel.mjs`. Accounts, uploads and clipping run only in the local app until a backend is connected. Generated files in `dist/` are ignored by Git. Private settings, data and Python dependencies are excluded from Vercel uploads through `.vercelignore`.
+
+PeakCut's FFmpeg work, speech model, background queue and saved files run on a persistent server. After a backend is connected, Vercel forwards requests to that server; it does not run video processing in Vercel Functions.
 
 ## Run on this Windows computer
 
@@ -30,7 +32,7 @@ Use a separate origin such as `https://backend.example.com`. Verify `/healthz` t
 Run from the repository folder once the real HTTPS backend is available:
 
 ```powershell
-.\deploy\Prepare-Vercel.ps1 -BackendUrl https://backend.example.com
+.\deploy\Prepare-Vercel.ps1 -BackendUrl https://backend.example.com -ReplaceStatic
 ```
 
 This creates `vercel.json`, with a route forwarding all requests to your backend. Review the generated hostname, then:
@@ -41,4 +43,4 @@ npx vercel --prod
 
 Select the intended Vercel account/project. After deployment, set the backend's `PEAKCUT_PUBLIC_URL` to the returned production URL, restart it, and check `/healthz`, sign-up, sign-in, an upload and a completed clip through Vercel. Check Vercel's current proxy/upload limits before choosing large upload chunk sizes. For large uploads or long-lived connections, using the backend's own HTTPS domain directly may be preferable.
 
-Commit `vercel.json` and connect the GitHub repository in Vercel if you want subsequent pushes to deploy automatically. Never add `.env`, `.venv`, `data`, OAuth secrets or AI keys to Git. No live Vercel deployment is created until the backend is available.
+Commit the updated `vercel.json` to switch the connected Vercel project from the informational website to the backend proxy. Never add `.env`, `.venv`, `data`, OAuth secrets or AI keys to Git. Verify backend behavior through the production domain after switching.
