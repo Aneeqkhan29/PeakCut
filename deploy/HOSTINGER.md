@@ -2,6 +2,8 @@
 
 The browser edition is a static website. Hostinger serves HTML, JavaScript, fonts and WebAssembly; each visitor's browser reads and processes their own video. No Python app, account, database, AI key or background server is required for this edition.
 
+**Video links are different:** the YouTube/Twitch link form requires `/api/link` on a working download backend. The static ZIP by itself supports local files, not server-side link downloads. See [LINK-IMPORT.md](LINK-IMPORT.md) before enabling link import on Hostinger. YouTube may refuse a server network even when the software is installed correctly.
+
 ## What works
 
 - Choose a video, then press **Make short automatically** for moment selection, optional local captions and MP4 export in one operation. If the source has no usable audio or caption generation fails, export continues with a clear notice instead of stopping before an MP4 is produced.

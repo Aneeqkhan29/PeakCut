@@ -115,6 +115,31 @@ try {
   assert.deepEqual(uploads, [], 'Automatic processing must not upload user media');
   assert.deepEqual(errors, []);
 
+  // Exercise link-to-export UI with a controlled transport. Live platform tests are separate.
+  await page.goto(origin + '/app');
+  await page.locator('#link-captions').uncheck();
+  const linkPayloads = [];
+  await page.route('**/api/link', async route => {
+    linkPayloads.push(route.request().postDataJSON());
+    const bytes = await readFile(fixture);
+    await route.fulfill({ status: 200, contentType: 'video/mp4', headers: { 'Content-Length': String(bytes.length) }, body: bytes });
+  });
+  await page.locator('#video-link').fill('https://youtu.be/jNQXAC9IVRw');
+  await page.locator('#import-link').click();
+  await page.waitForFunction(() => document.getElementById('status').textContent.includes('Your automatic short is ready'), null, { timeout: 180000 });
+  assert.deepEqual(linkPayloads, [{ url: 'https://youtu.be/jNQXAC9IVRw' }]);
+  await page.locator('#download').waitFor({ state: 'visible' });
+  await page.unroute('**/api/link');
+  await page.route('**/api/link', route => route.fulfill({ status: 422, contentType: 'application/json', body: JSON.stringify({ detail: 'YouTube refused downloads from this hosting server.' }) }));
+  await page.locator('#import-link').click();
+  await page.waitForFunction(() => document.getElementById('link-status').textContent.includes('YouTube refused downloads'));
+  assert.equal(await page.locator('#import-link').isEnabled(), true);
+  await page.locator('#video-link').fill('https://example.com/video.mp4');
+  await page.locator('#import-link').click();
+  await page.waitForFunction(() => document.getElementById('link-status').textContent.includes('HTTPS YouTube or Twitch'));
+  await page.unroute('**/api/link');
+  console.log('PASS: link form → imported video → automatic MP4 (controlled transport), visible platform errors, URL validation and retry.');
+
   if (process.env.RUN_CAPTIONS === '1') {
     const response = await fetch('https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/jfk.wav');
     assert.ok(response.ok);
@@ -125,6 +150,7 @@ try {
     await page.locator('#file').setInputFiles(speechVideo);
     await page.waitForFunction(() => !document.getElementById('settings').disabled);
     await page.locator('#language').selectOption('english');
+    await page.locator('#auto-captions').check();
     await page.locator('#automatic').click();
     await page.waitForFunction(() => document.getElementById('status').textContent.includes('Your automatic short is ready') || document.getElementById('state-badge').classList.contains('error'), null, { timeout: 600000 });
     const status = await page.locator('#status').textContent();

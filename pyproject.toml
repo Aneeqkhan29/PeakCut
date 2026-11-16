@@ -1,0 +1,9 @@
+[project]
+name = "peakcut-link-import"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi==0.162.5",
+    "yt-dlp[default]==2026.10.26",
+    "imageio-ffmpeg==0.8.1",
+]

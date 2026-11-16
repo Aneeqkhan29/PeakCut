@@ -34,5 +34,6 @@ venv/
 dist/
 node_modules/
 artifacts/
+api/vendor/
 
 .vercel

@@ -1,9 +1,15 @@
 const $ = id => document.getElementById(id);
 const ui = Object.fromEntries(['file','dropzone','settings','source','source-panel','filename','filemeta','replace','start','duration','layout','size','use-playhead','find','suggestion','language','transcribe','captions','manual','apply-manual','clear-captions','render','status','state-badge','progress','cancel','log','result','output','download','download-srt','resultmeta','clear-result','automatic','auto-captions','auto-status'].map(id => [id, $(id)]));
+ui.linkForm = $('link-form');
+ui.linkInput = $('video-link');
+ui.linkButton = $('import-link');
+ui.linkStatus = $('link-status');
+ui.linkCaptions = $('link-captions');
 let sourceFile, sourceURL, outputURL, srtURL, ffmpeg, modelWorker;
 let sourceDuration = 0, busy = false, generation = 0, engineInput = false, progressSeconds = 1;
 let captions = [], logs = [];
 let cancelModel;
+let linkAbort;
 
 function log(message) {
   logs.push(message);
@@ -14,6 +20,8 @@ function status(message, error = false) {
   ui.status.textContent = message;
   ui['auto-status'].textContent = message;
   ui['auto-status'].hidden = !sourceFile;
+  ui.linkStatus.textContent = message;
+  ui.linkStatus.hidden = !ui.linkInput.value.trim();
   ui['state-badge'].textContent = error ? 'Needs attention' : busy ? 'Processing' : 'Ready';
   ui['state-badge'].className = `badge ${error ? 'error' : busy ? 'working' : ''}`;
 }
@@ -23,6 +31,10 @@ function setBusy(value) {
   ui.settings.disabled = value || !sourceFile;
   ui.replace.disabled = value;
   ui.file.disabled = value;
+  ui.linkInput.disabled = value;
+  ui.linkButton.disabled = value;
+  ui.linkCaptions.disabled = value;
+  ui.linkButton.textContent = value ? 'Processing…' : 'Make short from link';
   ui.cancel.hidden = !value;
   ui.progress.hidden = !value;
   if (value) ui.progress.removeAttribute('value');
@@ -137,8 +149,8 @@ function drawCaptions() {
     ui.captions.append(row);
   });
 }
-async function chooseFile(file) {
-  if (busy || !file) return;
+async function chooseFile(file, imported = false) {
+  if ((busy && !imported) || !file) return;
   if (file.size > 500 * 1024 * 1024) { status('Choose a file under 500 MB. Browser processing needs space for the source and rendered video in memory.', true); return; }
   if (!file.size) { status('That file is empty. Choose another video.', true); return; }
   if (file.type && !file.type.startsWith('video/') && !/\.(mp4|mov|mkv|webm|m4v|avi)$/i.test(file.name)) { status('Choose a video file.', true); return; }
@@ -166,7 +178,7 @@ ui.source.addEventListener('loadedmetadata', () => {
   ui.start.max = Math.max(0, sourceDuration - 0.25);
   ui.duration.value = Math.min(30, Math.floor(sourceDuration));
   ui.filemeta.textContent = `${(sourceFile.size / 1024 / 1024).toFixed(1)} MB · ${Math.round(sourceDuration)} seconds · ${ui.source.videoWidth} × ${ui.source.videoHeight}`;
-  ui.settings.disabled = false;
+  ui.settings.disabled = busy;
   status('Video ready. Choose your moment and render a short.');
 });
 ui.source.addEventListener('error', () => status('This browser cannot preview that video. Try converting it to MP4 (H.264) first.', true));
@@ -329,7 +341,7 @@ async function renderSelected(token) {
   }
 }
 ui.render.addEventListener('click', () => run(renderSelected));
-ui.automatic.addEventListener('click', () => run(async token => {
+async function makeAutomatic(token) {
   selectedRange();
   clearResult();
   clearCaptions();
@@ -357,9 +369,68 @@ ui.automatic.addEventListener('click', () => run(async token => {
   checkToken(token);
   status(`Your automatic short is ready. ${notices.join(' ')} Download it before leaving this page.`);
   ui.result.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-}));
+}
+ui.automatic.addEventListener('click', () => run(makeAutomatic));
+
+ui.linkForm.addEventListener('submit', event => {
+  event.preventDefault();
+  const url = ui.linkInput.value.trim();
+  run(async token => {
+    ui['auto-captions'].checked = ui.linkCaptions.checked;
+    let parsed;
+    try { parsed = new URL(url); } catch { throw new Error('Paste a valid YouTube or Twitch video link.'); }
+    if (parsed.protocol !== 'https:' || !['youtube.com','www.youtube.com','m.youtube.com','music.youtube.com','youtu.be','twitch.tv','www.twitch.tv','clips.twitch.tv'].includes(parsed.hostname)) throw new Error('Use an HTTPS YouTube or Twitch video link.');
+    const controller = new AbortController();
+    linkAbort = controller;
+    const timer = setTimeout(() => controller.abort(), 250000);
+    try {
+      status('Importing the video from the download server. This can take a few minutes; keep this tab open.');
+      const response = await fetch('/api/link', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }), signal: controller.signal });
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(typeof error.detail === 'string' ? error.detail : 'Link import is unavailable on this host. Choose a video file instead.');
+      }
+      if (!response.headers.get('content-type')?.includes('video/')) throw new Error('The download server did not return a video.');
+      const total = Number(response.headers.get('content-length')) || 0;
+      if (total > 150 * 1024 * 1024) throw new Error('This video exceeds the 150 MB link import limit.');
+      const reader = response.body.getReader(), chunks = [];
+      let size = 0;
+      while (true) {
+        const result = await reader.read();
+        if (result.done) break;
+        size += result.value.length;
+        if (size > 150 * 1024 * 1024) { controller.abort(); throw new Error('This video exceeds the 150 MB link import limit.'); }
+        chunks.push(result.value);
+        status(`Receiving video: ${(size / 1024 / 1024).toFixed(1)} MB${total ? ` of ${(total / 1024 / 1024).toFixed(1)} MB` : ''}…`);
+        if (total) ui.progress.value = Math.min(1, size / total);
+      }
+      checkToken(token);
+      if (!size) throw new Error('The download server returned an empty video.');
+      await chooseFile(new File(chunks, 'link-import.mp4', { type: 'video/mp4' }), true);
+      if (!sourceDuration) await new Promise((resolve, reject) => {
+        const cleanup = () => { clearTimeout(timeout); ui.source.removeEventListener('loadedmetadata', ready); ui.source.removeEventListener('error', failed); controller.signal.removeEventListener('abort', failed); };
+        const ready = () => { cleanup(); resolve(); };
+        const failed = () => { cleanup(); reject(new Error('The imported video cannot be read by this browser. Try another video or use Chrome/Edge.')); };
+        const timeout = setTimeout(failed, 20000);
+        ui.source.addEventListener('loadedmetadata', ready, { once: true });
+        ui.source.addEventListener('error', failed, { once: true });
+        controller.signal.addEventListener('abort', failed, { once: true });
+      });
+      checkToken(token);
+      clearTimeout(timer);
+      await makeAutomatic(token);
+    } catch (error) {
+      if (error.name === 'AbortError') throw new Error('Link import timed out or was cancelled. Try a shorter public video or choose a local file.');
+      throw error;
+    } finally {
+      clearTimeout(timer);
+      if (linkAbort === controller) linkAbort = undefined;
+    }
+  });
+});
 ui.cancel.addEventListener('click', () => {
   generation++;
+  if (linkAbort) linkAbort.abort();
   if (cancelModel) cancelModel();
   if (ffmpeg) { ffmpeg.terminate(); ffmpeg = undefined; }
   if (modelWorker) { modelWorker.terminate(); modelWorker = undefined; }

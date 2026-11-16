@@ -5,6 +5,13 @@
   "buildCommand": "node deploy/build-vercel.mjs",
   "outputDirectory": "dist",
   "cleanUrls": true,
+  "functions": {
+    "api/link.py": {
+      "maxDuration": 300,
+      "includeFiles": "api/vendor/**",
+      "excludeFiles": "{web/**,studio/**,tests/**,node_modules/**,dist/**,artifacts/**,.venv/**}"
+    }
+  },
   "redirects": [
     { "source": "/login", "destination": "/app", "permanent": false },
     { "source": "/signup", "destination": "/app", "permanent": false },
