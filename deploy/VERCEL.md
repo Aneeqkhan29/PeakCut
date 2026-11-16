@@ -12,6 +12,13 @@ From the repository folder:
 
 Open http://127.0.0.1:8765. Keep the process running while using the app. Set your AI service in Settings, AI. Without a key, clip selection uses loudness. The speech model downloads on first start. Local settings, videos and models are ignored by Git.
 
+For the repository tests on Windows, enable UTF-8 so Hindi and Urdu output can be printed:
+
+```powershell
+$env:PYTHONUTF8 = '1'
+.\.venv\Scripts\python.exe tests/run.py
+```
+
 ## Prepare the backend
 
 Follow [DEPLOY.md](../DEPLOY.md) on your Linux server. Use its Docker deployment with accounts enabled, persistent volumes, PostgreSQL and HTTPS. Keep one app process. Do not expose the local account-free server to the internet.
