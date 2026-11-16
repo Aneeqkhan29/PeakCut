@@ -1,5 +1,5 @@
 const $ = id => document.getElementById(id);
-const ui = Object.fromEntries(['file','dropzone','settings','source','source-panel','filename','filemeta','replace','start','duration','layout','size','use-playhead','find','suggestion','language','transcribe','captions','manual','apply-manual','clear-captions','render','status','state-badge','progress','cancel','log','result','output','download','download-srt','resultmeta','clear-result','automatic','auto-captions'].map(id => [id, $(id)]));
+const ui = Object.fromEntries(['file','dropzone','settings','source','source-panel','filename','filemeta','replace','start','duration','layout','size','use-playhead','find','suggestion','language','transcribe','captions','manual','apply-manual','clear-captions','render','status','state-badge','progress','cancel','log','result','output','download','download-srt','resultmeta','clear-result','automatic','auto-captions','auto-status'].map(id => [id, $(id)]));
 let sourceFile, sourceURL, outputURL, srtURL, ffmpeg, modelWorker;
 let sourceDuration = 0, busy = false, generation = 0, engineInput = false, progressSeconds = 1;
 let captions = [], logs = [];
@@ -12,11 +12,14 @@ function log(message) {
 }
 function status(message, error = false) {
   ui.status.textContent = message;
+  ui['auto-status'].textContent = message;
+  ui['auto-status'].hidden = !sourceFile;
   ui['state-badge'].textContent = error ? 'Needs attention' : busy ? 'Processing' : 'Ready';
   ui['state-badge'].className = `badge ${error ? 'error' : busy ? 'working' : ''}`;
 }
 function setBusy(value) {
   busy = value;
+  ui.automatic.textContent = value ? 'Processing…' : 'Make short automatically';
   ui.settings.disabled = value || !sourceFile;
   ui.replace.disabled = value;
   ui.file.disabled = value;
