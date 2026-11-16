@@ -32,5 +32,7 @@ venv/
 .pytest_cache/
 .vercel/
 dist/
+node_modules/
+artifacts/
 
 .vercel

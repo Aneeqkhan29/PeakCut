@@ -1,8 +1,8 @@
 # Vercel with a separate PeakCut server
 
-The public website is deployed at https://peakcut-ochre.vercel.app and connected to the GitHub repository. The current `vercel.json` builds the landing page and setup information with `node deploy/build-vercel.mjs`. Accounts, uploads and clipping run only in the local app until a backend is connected. Generated files in `dist/` are ignored by Git. Private settings, data and Python dependencies are excluded from Vercel uploads through `.vercelignore`.
+The website is deployed at https://peakcut-ochre.vercel.app and connected to the GitHub repository. The current `vercel.json` builds the landing page and browser studio at `/app` with `node deploy/build-vercel.mjs`. The browser studio processes videos on the visitor's own device and does not require the Python backend. See [HOSTINGER.md](HOSTINGER.md) for browser-edition features and static Hostinger deployment. Generated files in `dist/` are ignored by Git. Private settings, data and Python dependencies are excluded from Vercel uploads through `.vercelignore`.
 
-PeakCut's FFmpeg work, speech model, background queue and saved files run on a persistent server. After a backend is connected, Vercel forwards requests to that server; it does not run video processing in Vercel Functions.
+The remaining instructions apply only if you want the full **Python edition**, including live recording and social posting. Its background queue and files need a persistent server. Replacing the browser build with the backend proxy forwards all requests to that server and removes the browser edition from this deployment. Vercel Functions do not perform video processing in either setup.
 
 ## Run on this Windows computer
 

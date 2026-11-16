@@ -1,14 +1,13 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "installCommand": "",
+  "installCommand": "npm ci --ignore-scripts",
   "buildCommand": "node deploy/build-vercel.mjs",
   "outputDirectory": "dist",
   "cleanUrls": true,
   "redirects": [
-    { "source": "/app", "destination": "/get-started", "permanent": false },
-    { "source": "/login", "destination": "/get-started", "permanent": false },
-    { "source": "/signup", "destination": "/get-started", "permanent": false },
+    { "source": "/login", "destination": "/app", "permanent": false },
+    { "source": "/signup", "destination": "/app", "permanent": false },
     { "source": "/reset", "destination": "/get-started", "permanent": false }
   ]
 }

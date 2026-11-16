@@ -5,7 +5,8 @@ secrets/
 .env
 .env.*
 storage.json
-studio/
+studio/*.py
+studio/__pycache__/
 tests/
 requirements.txt
 __pycache__/
@@ -13,3 +14,4 @@ __pycache__/
 *.db
 *.sqlite*
 dist/
+artifacts/
